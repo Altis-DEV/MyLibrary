@@ -3,18 +3,24 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
--- Logic Drag chuẩn: Chỉ nhận input chính xác từ ngón tay/con trỏ đã click ban đầu
+-- Logic Drag chuẩn chống dính trên Mobile: Phải giữ chạm trên 0.2s mới bắt đầu kéo
 local function MakeDraggable(trigger, target)
-    trigger.Active = true -- Chặn input xuyên qua UI
+    trigger.Active = true
+    
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local isDragging = false
             local dragStart = input.Position
             local startPos = target.Position
             
+            -- Hẹn giờ 0.2 giây kiểm tra xem người dùng có giữ tay không
+            local holdTimer = task.delay(0.2, function()
+                isDragging = true
+            end)
+            
             local connection
             connection = UserInputService.InputChanged:Connect(function(changeInput)
-                -- Kiểm tra identity: Phải đúng cái input vừa chạm vào mới xử lý
-                if changeInput == input then
+                if changeInput == input and isDragging then
                     local delta = changeInput.Position - dragStart
                     target.Position = UDim2.new(
                         startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -25,14 +31,21 @@ local function MakeDraggable(trigger, target)
             
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    if connection then connection:Disconnect() end
+                    -- Nếu nhấc tay lên trước 0.2s thì hủy lệnh hẹn giờ và ngắt kết nối
+                    if holdTimer then
+                        task.cancel(holdTimer)
+                    end
+                    isDragging = false
+                    if connection then 
+                        connection:Disconnect() 
+                    end
                 end
             end)
         end
     end)
 end
 
--- Logic Resize chuẩn, tương tự như Drag
+-- Logic Resize giữ nguyên để mượt mà khi kéo góc
 local function MakeResizable(trigger, target)
     trigger.Active = true
     trigger.InputBegan:Connect(function(input)
@@ -192,11 +205,9 @@ return function(Theme)
         TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
         TabLayout.Parent = TabContainer
 
-        -- ================= 3. BodyWrapper & MainFrame (Scrolling) =================
-        -- Wrapper dùng để chứa MainFrame và ResizeCorner, tránh việc ResizeCorner bị cuộn đi
+        -- ================= 3. BodyWrapper & MainFrame =================
         local BodyWrapper = Instance.new("Frame")
         BodyWrapper.Name = "BodyWrapper"
-        -- Tổng chiều cao = (Topbar 30) + (Tab 30) + (DragWrapper 25) = 85
         BodyWrapper.Size = UDim2.new(1, 0, 1, -85)
         BodyWrapper.BackgroundTransparency = 1
         BodyWrapper.LayoutOrder = 3
@@ -217,7 +228,7 @@ return function(Theme)
         MainStroke.Color = Theme.Border
         MainStroke.Parent = MainFrame
 
-        -- ResizeCorner (ZIndex 9, Kích thước to hơn)
+        -- ResizeCorner (ZIndex 9, TextSize 40 chạm sát góc)
         local ResizeCorner = Instance.new("TextLabel")
         ResizeCorner.Name = "ResizeCorner"
         ResizeCorner.Size = UDim2.new(0, 30, 0, 30)
@@ -226,12 +237,11 @@ return function(Theme)
         ResizeCorner.BackgroundTransparency = 1
         ResizeCorner.Text = "◢"
         ResizeCorner.TextColor3 = Theme.Accent1
-        ResizeCorner.TextSize = 25
+        ResizeCorner.TextSize = 40
         ResizeCorner.ZIndex = 9
         ResizeCorner.Parent = BodyWrapper
 
-        -- ================= 4. DragHandle (ZIndex 8, Cách xuống 20 stud) =================
-        -- Wrapper cao 25px để tạo khoảng trống đẩy DragHandle xuống
+        -- ================= 4. DragHandle (ZIndex 8, Trục Y = 10, Size X = 200) =================
         local DragWrapper = Instance.new("Frame")
         DragWrapper.Name = "DragWrapper"
         DragWrapper.Size = UDim2.new(1, 0, 0, 25)
@@ -241,10 +251,10 @@ return function(Theme)
 
         local DragHandle = Instance.new("Frame")
         DragHandle.Name = "DragHandle"
-        DragHandle.Size = UDim2.new(0, 100, 0, 5)
-        DragHandle.Position = UDim2.new(0.5, 0, 0, 20) -- Đẩy xuống dưới 20 stud
+        DragHandle.Size = UDim2.new(0, 200, 0, 5)
+        DragHandle.Position = UDim2.new(0.5, 0, 0, 10) -- Trục Y = 10
         DragHandle.AnchorPoint = Vector2.new(0.5, 0)
-        DragHandle.BackgroundColor3 = Theme.Accent1 -- Đổi thành Accent1 theo yêu cầu
+        DragHandle.BackgroundColor3 = Theme.Accent1
         DragHandle.BorderSizePixel = 0
         DragHandle.ZIndex = 8
         DragHandle.Parent = DragWrapper
@@ -267,7 +277,6 @@ return function(Theme)
             if isMinimized then
                 preMinimizeSize = WindowRoot.Size
                 TweenService:Create(MinimizeButton, TweenInfo.new(0.2), {Rotation = -90}):Play()
-                -- Shrink size về đúng chiều cao của Topbar (30)
                 TweenService:Create(WindowRoot, TweenInfo.new(0.2), {Size = UDim2.new(preMinimizeSize.X.Scale, preMinimizeSize.X.Offset, 0, 30)}):Play()
             else
                 TweenService:Create(MinimizeButton, TweenInfo.new(0.2), {Rotation = 0}):Play()
