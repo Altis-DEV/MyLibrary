@@ -3,7 +3,6 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
--- Logic Drag Đỉnh Cao: Không dính Mobile, Kéo mượt PC, Cho phép vuốt qua
 local function MakeDraggable(trigger, target)
     trigger.Active = true
     
@@ -15,7 +14,6 @@ local function MakeDraggable(trigger, target)
             local startPos = target.Position
             
             local holdTimer
-            -- PC: Kéo được luôn. Mobile: Phải giữ 0.2s
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 isDragging = true
             else
@@ -37,7 +35,6 @@ local function MakeDraggable(trigger, target)
                             startPos.Y.Scale, startPos.Y.Offset + delta.Y
                         )
                     else
-                        -- Nếu tay vuốt đi quá 10 pixel trước 0.2s -> Hiểu là đang cuộn/lướt -> Hủy drag
                         local delta = changeInput.Position - dragStart
                         if delta.Magnitude > 10 then
                             isCancelled = true
@@ -47,7 +44,6 @@ local function MakeDraggable(trigger, target)
                 end
             end)
             
-            -- Dùng UserInputService.InputEnded bắt toàn cục (Global) để chống lỗi nhấc tay ngoài lề
             connectionEnd = UserInputService.InputEnded:Connect(function(endInput)
                 if endInput == input then
                     isCancelled = true
@@ -61,7 +57,6 @@ local function MakeDraggable(trigger, target)
     end)
 end
 
--- Fix luôn Resize bằng InputEnded toàn cục để không bao giờ bị dính tay
 local function MakeResizable(trigger, target)
     trigger.Active = true
     trigger.InputBegan:Connect(function(input)
@@ -117,6 +112,7 @@ return function(Theme)
         local titleText = config.Title or "Iris UI Remake"
         local winSize = config.Size or UDim2.new(0, 400, 0, 300)
         local winPos = config.Position or UDim2.fromScale(0.5, 0.5)
+        local customFont = config.Font or Theme.Font
         
         local alignMap = {
             Left = Enum.TextXAlignment.Left,
@@ -146,7 +142,6 @@ return function(Theme)
         RootLayout.SortOrder = Enum.SortOrder.LayoutOrder
         RootLayout.Parent = WindowRoot
 
-        -- ================= 1. Topbar (Chiều cao 30, ZIndex 10) =================
         local Topbar = Instance.new("Frame")
         Topbar.Name = "Topbar"
         Topbar.Size = UDim2.new(1, 0, 0, 30)
@@ -202,7 +197,6 @@ return function(Theme)
         TitleLabel.ZIndex = 10
         TitleLabel.Parent = TitleFrame
 
-        -- ================= 2. TabContainer (Chiều cao 30) =================
         local TabContainer = Instance.new("ScrollingFrame")
         TabContainer.Name = "TabContainer"
         TabContainer.Size = UDim2.new(1, 0, 0, 30)
@@ -223,7 +217,6 @@ return function(Theme)
         TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
         TabLayout.Parent = TabContainer
 
-        -- ================= 3. BodyWrapper & MainFrame =================
         local BodyWrapper = Instance.new("Frame")
         BodyWrapper.Name = "BodyWrapper"
         BodyWrapper.Size = UDim2.new(1, 0, 1, -85)
@@ -246,7 +239,6 @@ return function(Theme)
         MainStroke.Color = Theme.Border
         MainStroke.Parent = MainFrame
 
-        -- ResizeCorner (ZIndex 9, TextSize 40 chạm sát góc)
         local ResizeCorner = Instance.new("TextLabel")
         ResizeCorner.Name = "ResizeCorner"
         ResizeCorner.Size = UDim2.new(0, 30, 0, 30)
@@ -259,7 +251,6 @@ return function(Theme)
         ResizeCorner.ZIndex = 9
         ResizeCorner.Parent = BodyWrapper
 
-        -- ================= 4. DragHandle (ZIndex 8, Trục Y = 10, Size X = 200) =================
         local DragWrapper = Instance.new("Frame")
         DragWrapper.Name = "DragWrapper"
         DragWrapper.Size = UDim2.new(1, 0, 0, 25)
@@ -277,14 +268,13 @@ return function(Theme)
         DragHandle.ZIndex = 8
         DragHandle.Parent = DragWrapper
 
-        -- Kích hoạt hệ thống kéo/thả mới nhất
         MakeDraggable(Topbar, WindowRoot)
         MakeDraggable(DragHandle, WindowRoot)
         MakeResizable(ResizeCorner, WindowRoot)
 
         local TextElements = {TitleLabel, MinimizeButton, DestroyButton, ResizeCorner}
         for _, el in ipairs(TextElements) do
-            ApplyFont(el, config.Font, Theme.Font)
+            ApplyFont(el, customFont, Theme.Font)
         end
 
         local isMinimized = false
@@ -311,7 +301,8 @@ return function(Theme)
         local WindowObject = {
             MainFrame = MainFrame,
             TabContainer = TabContainer,
-            TextElements = TextElements
+            TextElements = TextElements,
+            Font = customFont -- Lưu Font để truyền cho Tab/Elements sau này
         }
 
         function WindowObject.SetTitle(newTitle)
@@ -328,6 +319,7 @@ return function(Theme)
         end
 
         function WindowObject.SetFont(newFont)
+            WindowObject.Font = newFont -- Cập nhật font hệ thống
             for _, el in ipairs(WindowObject.TextElements) do
                 ApplyFont(el, newFont, Theme.Font)
             end
