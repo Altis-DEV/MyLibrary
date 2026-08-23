@@ -3,49 +3,65 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
--- Logic Drag chuẩn chống dính trên Mobile: Phải giữ chạm trên 0.2s mới bắt đầu kéo
+-- Logic Drag Đỉnh Cao: Không dính Mobile, Kéo mượt PC, Cho phép vuốt qua
 local function MakeDraggable(trigger, target)
     trigger.Active = true
     
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local isDragging = false
+            local isCancelled = false
             local dragStart = input.Position
             local startPos = target.Position
             
-            -- Hẹn giờ 0.2 giây kiểm tra xem người dùng có giữ tay không
-            local holdTimer = task.delay(0.2, function()
+            local holdTimer
+            -- PC: Kéo được luôn. Mobile: Phải giữ 0.2s
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 isDragging = true
-            end)
+            else
+                holdTimer = task.delay(0.2, function()
+                    if not isCancelled then
+                        isDragging = true
+                    end
+                end)
+            end
             
-            local connection
-            connection = UserInputService.InputChanged:Connect(function(changeInput)
-                if changeInput == input and isDragging then
-                    local delta = changeInput.Position - dragStart
-                    target.Position = UDim2.new(
-                        startPos.X.Scale, startPos.X.Offset + delta.X,
-                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                    )
+            local connectionMove, connectionEnd
+            
+            connectionMove = UserInputService.InputChanged:Connect(function(changeInput)
+                if changeInput == input then
+                    if isDragging then
+                        local delta = changeInput.Position - dragStart
+                        target.Position = UDim2.new(
+                            startPos.X.Scale, startPos.X.Offset + delta.X,
+                            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                        )
+                    else
+                        -- Nếu tay vuốt đi quá 10 pixel trước 0.2s -> Hiểu là đang cuộn/lướt -> Hủy drag
+                        local delta = changeInput.Position - dragStart
+                        if delta.Magnitude > 10 then
+                            isCancelled = true
+                            if holdTimer then task.cancel(holdTimer) end
+                        end
+                    end
                 end
             end)
             
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    -- Nếu nhấc tay lên trước 0.2s thì hủy lệnh hẹn giờ và ngắt kết nối
-                    if holdTimer then
-                        task.cancel(holdTimer)
-                    end
+            -- Dùng UserInputService.InputEnded bắt toàn cục (Global) để chống lỗi nhấc tay ngoài lề
+            connectionEnd = UserInputService.InputEnded:Connect(function(endInput)
+                if endInput == input then
+                    isCancelled = true
                     isDragging = false
-                    if connection then 
-                        connection:Disconnect() 
-                    end
+                    if holdTimer then task.cancel(holdTimer) end
+                    if connectionMove then connectionMove:Disconnect() end
+                    if connectionEnd then connectionEnd:Disconnect() end
                 end
             end)
         end
     end)
 end
 
--- Logic Resize giữ nguyên để mượt mà khi kéo góc
+-- Fix luôn Resize bằng InputEnded toàn cục để không bao giờ bị dính tay
 local function MakeResizable(trigger, target)
     trigger.Active = true
     trigger.InputBegan:Connect(function(input)
@@ -53,8 +69,9 @@ local function MakeResizable(trigger, target)
             local dragStart = input.Position
             local startSize = target.Size
             
-            local connection
-            connection = UserInputService.InputChanged:Connect(function(changeInput)
+            local connectionMove, connectionEnd
+            
+            connectionMove = UserInputService.InputChanged:Connect(function(changeInput)
                 if changeInput == input then
                     local delta = changeInput.Position - dragStart
                     local newWidth = math.max(200, startSize.X.Offset + delta.X)
@@ -63,9 +80,10 @@ local function MakeResizable(trigger, target)
                 end
             end)
             
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    if connection then connection:Disconnect() end
+            connectionEnd = UserInputService.InputEnded:Connect(function(endInput)
+                if endInput == input then
+                    if connectionMove then connectionMove:Disconnect() end
+                    if connectionEnd then connectionEnd:Disconnect() end
                 end
             end)
         end
@@ -252,14 +270,14 @@ return function(Theme)
         local DragHandle = Instance.new("Frame")
         DragHandle.Name = "DragHandle"
         DragHandle.Size = UDim2.new(0, 200, 0, 5)
-        DragHandle.Position = UDim2.new(0.5, 0, 0, 10) -- Trục Y = 10
+        DragHandle.Position = UDim2.new(0.5, 0, 0, 10)
         DragHandle.AnchorPoint = Vector2.new(0.5, 0)
         DragHandle.BackgroundColor3 = Theme.Accent1
         DragHandle.BorderSizePixel = 0
         DragHandle.ZIndex = 8
         DragHandle.Parent = DragWrapper
 
-        -- Kích hoạt hệ thống kéo/thả mới
+        -- Kích hoạt hệ thống kéo/thả mới nhất
         MakeDraggable(Topbar, WindowRoot)
         MakeDraggable(DragHandle, WindowRoot)
         MakeResizable(ResizeCorner, WindowRoot)
