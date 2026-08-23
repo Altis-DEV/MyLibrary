@@ -8,7 +8,8 @@ local Window = {}
 Window.__index = Window
 
 
-local function Tween(obj, time, props)
+
+local function Tween(obj,time,props)
 
     TweenService:Create(
         obj,
@@ -24,10 +25,9 @@ end
 
 
 
-function Window.new(config, Theme)
+function Window.new(config,Theme)
 
-    local self = setmetatable({}, Window)
-
+    local self = setmetatable({},Window)
 
     config = config or {}
 
@@ -50,12 +50,14 @@ function Window.new(config, Theme)
 
     self.Theme = Theme
 
-    self.Minimized = true
+
+    -- Window starts opened
+    self.Minimized = false
 
 
 
     --------------------------------------------------
-    -- ScreenGui
+    -- GUI
     --------------------------------------------------
 
     self.Gui = Instance.new("ScreenGui")
@@ -99,12 +101,15 @@ function Window.new(config, Theme)
 
         self.MainFrame.Position =
             UDim2.fromScale(
-                .5,
-                .5
+                0.5,
+                0.5
             )
 
         self.MainFrame.AnchorPoint =
-            Vector2.new(.5,.5)
+            Vector2.new(
+                0.5,
+                0.5
+            )
 
     end
 
@@ -119,7 +124,9 @@ function Window.new(config, Theme)
     -- Topbar
     --------------------------------------------------
 
-    self.Topbar = Instance.new("Frame")
+    self.Topbar =
+        Instance.new("Frame")
+
 
     self.Topbar.Size =
         UDim2.new(
@@ -129,11 +136,14 @@ function Window.new(config, Theme)
             25
         )
 
+
     self.Topbar.BackgroundColor3 =
         Theme.Accent1
 
+
     self.Topbar.BorderColor3 =
         Theme.Border
+
 
     self.Topbar.Parent =
         self.MainFrame
@@ -142,7 +152,7 @@ function Window.new(config, Theme)
 
 
     --------------------------------------------------
-    -- Minimize Button
+    -- Minimize
     --------------------------------------------------
 
     self.Minimize =
@@ -160,8 +170,9 @@ function Window.new(config, Theme)
         "▼"
 
 
+    -- Open state
     self.Minimize.Rotation =
-        -90
+        0
 
 
     self.Minimize.BackgroundTransparency =
@@ -182,6 +193,7 @@ function Window.new(config, Theme)
 
     self.Minimize.Parent =
         self.Topbar
+
 
 
 
@@ -272,12 +284,12 @@ function Window.new(config, Theme)
         Theme.Text
 
 
-    self.TitleFrame.Font =
-        self.Font
-
-
     self.TitleFrame.TextSize =
         18
+
+
+    self.TitleFrame.Font =
+        self.Font
 
 
 
@@ -302,6 +314,7 @@ function Window.new(config, Theme)
 
     self.TitleFrame.Parent =
         self.Topbar
+
 
 
 
@@ -340,6 +353,7 @@ function Window.new(config, Theme)
 
     self.TabContainer.Parent =
         self.MainFrame
+
 
 
 
@@ -404,12 +418,12 @@ function Window.new(config, Theme)
 
 
     --------------------------------------------------
-    -- Drag System
+    -- Drag
     --------------------------------------------------
 
     local dragging = false
     local dragStart
-    local startPosition
+    local startPos
 
 
 
@@ -428,7 +442,7 @@ function Window.new(config, Theme)
             dragStart =
                 input.Position
 
-            startPosition =
+            startPos =
                 self.MainFrame.Position
 
         end
@@ -455,10 +469,10 @@ function Window.new(config, Theme)
 
                 self.MainFrame.Position =
                     UDim2.new(
-                        startPosition.X.Scale,
-                        startPosition.X.Offset + delta.X,
-                        startPosition.Y.Scale,
-                        startPosition.Y.Offset + delta.Y
+                        startPos.X.Scale,
+                        startPos.X.Offset + delta.X,
+                        startPos.Y.Scale,
+                        startPos.Y.Offset + delta.Y
                     )
 
             end
@@ -489,14 +503,13 @@ function Window.new(config, Theme)
 
 
 
+
     --------------------------------------------------
-    -- Resize System (ImGui style)
+    -- Resize (bottom right only)
     --------------------------------------------------
 
     local resizing = false
-
     local resizeStart
-
     local startSize
 
 
@@ -518,10 +531,7 @@ function Window.new(config, Theme)
 
 
             startSize =
-                Vector2.new(
-                    self.MainFrame.AbsoluteSize.X,
-                    self.MainFrame.AbsoluteSize.Y
-                )
+                self.MainFrame.AbsoluteSize
 
         end
 
@@ -547,18 +557,21 @@ function Window.new(config, Theme)
                     input.Position - resizeStart
 
 
-
                 self.MainFrame.Size =
                     UDim2.fromOffset(
+
                         math.max(
-                            250,
+                            300,
                             startSize.X + delta.X
                         ),
+
                         math.max(
-                            120,
+                            300,
                             startSize.Y + delta.Y
                         )
+
                     )
+
 
             end
 
@@ -587,13 +600,22 @@ function Window.new(config, Theme)
 
 
 
+
     --------------------------------------------------
     -- Events
     --------------------------------------------------
 
     self.Minimize.MouseButton1Click:Connect(function()
 
-        self:ToggleMinimize()
+        if self.Minimized then
+
+            self:Open()
+
+        else
+
+            self:Close()
+
+        end
 
     end)
 
@@ -604,6 +626,7 @@ function Window.new(config, Theme)
         self:Destroy()
 
     end)
+
 
 
 
@@ -620,61 +643,38 @@ end
 
 
 
-
-function Window:ToggleMinimize()
-
-    self.Minimized =
-        not self.Minimized
-
-
-    Tween(
-        self.Minimize,
-        .2,
-        {
-            Rotation =
-                self.Minimized
-                and -90
-                or 0
-        }
-    )
-
-
-    Tween(
-        self.MainFrame,
-        .2,
-        {
-            Size =
-                UDim2.fromOffset(
-                    self.Size.X,
-                    self.Minimized
-                    and 25
-                    or self.Size.Y
-                )
-        }
-    )
-
-
-    self.TabContainer.Visible =
-        not self.Minimized
-
-
-end
-
-
-
-
+--------------------------------------------------
+-- Official ImGui style methods
+--------------------------------------------------
 
 
 function Window:Open()
 
-    self.MainFrame.Visible = true
-
-
-    if self.Minimized then
-
-        self:ToggleMinimize()
-
+    if not self.Minimized then
+        return
     end
+
+
+    self.Minimized = false
+
+
+    self.TabContainer.Visible = true
+
+
+    self.MainFrame.Size =
+        UDim2.fromOffset(
+            self.Size.X,
+            self.Size.Y
+        )
+
+
+    Tween(
+        self.Minimize,
+        0.2,
+        {
+            Rotation = 0
+        }
+    )
 
 end
 
@@ -684,11 +684,31 @@ end
 
 function Window:Close()
 
-    if not self.Minimized then
-
-        self:ToggleMinimize()
-
+    if self.Minimized then
+        return
     end
+
+
+    self.Minimized = true
+
+
+    self.TabContainer.Visible = false
+
+
+    self.MainFrame.Size =
+        UDim2.fromOffset(
+            self.Size.X,
+            25
+        )
+
+
+    Tween(
+        self.Minimize,
+        0.2,
+        {
+            Rotation = -90
+        }
+    )
 
 end
 
@@ -698,8 +718,8 @@ end
 
 function Window:Toggle()
 
-    self.MainFrame.Visible =
-        not self.MainFrame.Visible
+    self.Gui.Enabled =
+        not self.Gui.Enabled
 
 end
 
