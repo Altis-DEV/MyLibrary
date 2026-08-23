@@ -1,7 +1,7 @@
 -- Path: Altis-DEV/MyLibrary/Src/Window.lua
 
-
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 
 local Window = {}
@@ -9,339 +9,396 @@ Window.__index = Window
 
 
 
+local function Tween(obj,time,prop)
+
+    TweenService:Create(
+        obj,
+        TweenInfo.new(time,Enum.EasingStyle.Quad),
+        prop
+    ):Play()
+
+end
+
+
+
+
 function Window.new(config,Theme)
 
-    local self = setmetatable({},Window)
+local self=setmetatable({},Window)
 
+config=config or {}
 
-    config = config or {}
 
+self.Title=config.Title or "Window"
+self.Size=config.Size or Vector2.new(500,350)
+self.TextAlignment=config.TextAlignment or "Left"
+self.Font=config.Font or Enum.Font.Code
+self.Theme=Theme
 
-    self.Title =
-        config.Title or "Window"
+self.Minimized=true
 
 
-    self.Size =
-        config.Size or Vector2.new(400,300)
 
+self.Gui=Instance.new("ScreenGui")
+self.Gui.Name="AltisImGui"
+self.Gui.ResetOnSpawn=false
 
-    self.Position =
-        config.Position
 
 
-    self.TextAlignment =
-        config.TextAlignment or "Left"
+self.MainFrame=Instance.new("Frame")
+self.MainFrame.Size=UDim2.fromOffset(
+    self.Size.X,
+    self.Size.Y
+)
 
+self.MainFrame.Position=
+    UDim2.fromScale(.5,.5)
 
-    self.Font =
-        config.Font or Enum.Font.Code
+self.MainFrame.AnchorPoint=
+    Vector2.new(.5,.5)
 
+self.MainFrame.BackgroundColor3=
+    Theme.Background
 
-    self.Theme = Theme
+self.MainFrame.BorderColor3=
+    Theme.Border
 
+self.MainFrame.Parent=self.Gui
 
-    self.Minimized = false
 
 
 
-    self.Gui = Instance.new("ScreenGui")
-    self.Gui.Name = "AltisWindow"
-    self.Gui.ResetOnSpawn = false
+-- TOPBAR
 
+self.Topbar=Instance.new("Frame")
 
+self.Topbar.Size=
+    UDim2.new(1,0,0,25)
 
-    self.MainFrame = Instance.new("Frame")
-    self.MainFrame.Size =
-        UDim2.fromOffset(
-            self.Size.X,
-            self.Size.Y
-        )
+self.Topbar.BackgroundColor3=
+    Theme.Accent1
 
-    self.MainFrame.BackgroundColor3 =
-        Theme.Background
+self.Topbar.BorderColor3=
+    Theme.Border
 
-    self.MainFrame.BorderColor3 =
-        Theme.Border
+self.Topbar.Parent=self.MainFrame
 
 
-    self.MainFrame.Parent =
-        self.Gui
 
 
+-- MINIMIZE
 
-    if self.Position then
+self.Minimize=Instance.new("TextButton")
 
-        self.MainFrame.Position =
-            UDim2.fromOffset(
-                self.Position.X,
-                self.Position.Y
-            )
+self.Minimize.Size=
+    UDim2.fromOffset(25,25)
 
-    else
+self.Minimize.Text="▼"
 
-        self.MainFrame.Position =
-            UDim2.fromScale(
-                .5,
-                .5
-            )
+self.Minimize.Rotation=-90
 
-        self.MainFrame.AnchorPoint =
-            Vector2.new(.5,.5)
+self.Minimize.BackgroundTransparency=1
 
-    end
+self.Minimize.TextColor3=
+    Theme.Text
 
+self.Minimize.Font=self.Font
 
+self.Minimize.Parent=self.Topbar
 
-    --------------------------------------------------
-    -- Topbar
-    --------------------------------------------------
 
-    self.Topbar = Instance.new("Frame")
 
-    self.Topbar.Size =
-        UDim2.new(
-            1,
-            0,
-            0,
-            20
-        )
 
+-- CLOSE
 
-    self.Topbar.BackgroundColor3 =
-        Theme.Accent1
+self.CloseButton=Instance.new("TextButton")
 
+self.CloseButton.Size=
+    UDim2.fromOffset(25,25)
 
-    self.Topbar.BorderColor3 =
-        Theme.Border
+self.CloseButton.Position=
+    UDim2.new(1,-25,0,0)
 
+self.CloseButton.Text="X"
 
-    self.Topbar.Parent =
-        self.MainFrame
+self.CloseButton.BackgroundTransparency=1
 
+self.CloseButton.TextColor3=
+    Theme.Text
 
+self.CloseButton.Font=self.Font
 
-    --------------------------------------------------
-    -- Minimize button
-    --------------------------------------------------
+self.CloseButton.Parent=self.Topbar
 
-    self.Minimize =
-        Instance.new("TextButton")
 
 
-    self.Minimize.Size =
-        UDim2.fromOffset(
-            20,
-            20
-        )
 
+-- TITLE
 
-    self.Minimize.BackgroundTransparency = 1
+self.TitleFrame=Instance.new("TextLabel")
 
-    self.Minimize.TextTransparency = 1
+self.TitleFrame.Size=
+    UDim2.new(1,-50,1,0)
 
-    self.Minimize.Text = "▶"
+self.TitleFrame.Position=
+    UDim2.fromOffset(30,0)
 
-    self.Minimize.Parent =
-        self.Topbar
+self.TitleFrame.BackgroundTransparency=1
 
+self.TitleFrame.Text=self.Title
 
+self.TitleFrame.TextSize=18
 
-    --------------------------------------------------
-    -- Close button
-    --------------------------------------------------
+self.TitleFrame.TextColor3=
+    Theme.Text
 
-    self.CloseButton =
-        Instance.new("TextButton")
+self.TitleFrame.Font=self.Font
 
 
-    self.CloseButton.Size =
-        UDim2.fromOffset(
-            20,
-            20
-        )
+if self.TextAlignment=="Center" then
 
+self.TitleFrame.TextXAlignment=
+    Enum.TextXAlignment.Center
 
-    self.CloseButton.Position =
-        UDim2.new(
-            1,
-            -20,
-            0,
-            0
-        )
+elseif self.TextAlignment=="Right" then
 
+self.TitleFrame.TextXAlignment=
+    Enum.TextXAlignment.Right
 
-    self.CloseButton.Text = "X"
+else
 
-    self.CloseButton.BackgroundTransparency = 1
+self.TitleFrame.TextXAlignment=
+    Enum.TextXAlignment.Left
 
-    self.CloseButton.TextColor3 =
-        Theme.Text
-
-
-    self.CloseButton.Parent =
-        self.Topbar
-
-
-
-    --------------------------------------------------
-    -- Title
-    --------------------------------------------------
-
-    self.TitleFrame =
-        Instance.new("TextLabel")
-
-
-    self.TitleFrame.Size =
-        UDim2.new(
-            1,
-            -40,
-            1,
-            0
-        )
-
-
-    self.TitleFrame.Position =
-        UDim2.fromOffset(
-            20,
-            0
-        )
-
-
-    self.TitleFrame.BackgroundTransparency = 1
-
-
-    self.TitleFrame.Text =
-        self.Title
-
-
-    self.TitleFrame.TextColor3 =
-        Theme.Text
-
-
-    self.TitleFrame.Font =
-        self.Font
-
-
-    self.TitleFrame.TextXAlignment =
-        self:GetAlignment()
-
-
-    self.TitleFrame.Parent =
-        self.Topbar
-
-
-
-    --------------------------------------------------
-    -- Tab Container
-    --------------------------------------------------
-
-    self.TabContainer =
-        Instance.new("Frame")
-
-
-    self.TabContainer.Size =
-        UDim2.new(
-            1,
-            0,
-            0,
-            20
-        )
-
-
-    self.TabContainer.Position =
-        UDim2.fromOffset(
-            0,
-            20
-        )
-
-
-    self.TabContainer.BackgroundColor3 =
-        Theme.Accent2
-
-
-    self.TabContainer.BorderColor3 =
-        Theme.Border
-
-
-    self.TabContainer.Parent =
-        self.MainFrame
-
-
-
-    --------------------------------------------------
-    -- Resize Corner
-    --------------------------------------------------
-
-    self.Resize =
-        Instance.new("TextButton")
-
-
-    self.Resize.Size =
-        UDim2.fromOffset(
-            15,
-            15
-        )
-
-
-    self.Resize.Position =
-        UDim2.new(
-            1,
-            -15,
-            1,
-            -15
-        )
-
-
-    self.Resize.Text = ""
-
-
-    self.Resize.BackgroundColor3 =
-        Theme.Accent1
-
-
-    self.Resize.Parent =
-        self.MainFrame
-
-
-
-    self.Minimize.MouseButton1Click:Connect(function()
-        self:ToggleMinimize()
-    end)
-
-
-    self.CloseButton.MouseButton1Click:Connect(function()
-        self:Destroy()
-    end)
-
-
-
-    self.Gui.Parent =
-        game:GetService("CoreGui")
-
-
-    return self
 end
 
 
+self.TitleFrame.Parent=self.Topbar
 
 
 
-function Window:GetAlignment()
 
-    if self.TextAlignment == "Right" then
+-- TAB CONTAINER
 
-        return Enum.TextXAlignment.Right
+self.TabContainer=Instance.new("Frame")
 
-    elseif self.TextAlignment == "Center" then
+self.TabContainer.Size=
+    UDim2.new(1,0,0,25)
 
-        return Enum.TextXAlignment.Center
+self.TabContainer.Position=
+    UDim2.fromOffset(0,25)
 
-    end
+self.TabContainer.BackgroundColor3=
+    Theme.Background
+
+self.TabContainer.BorderColor3=
+    Theme.Border
+
+self.TabContainer.Parent=self.MainFrame
 
 
-    return Enum.TextXAlignment.Left
+
+
+-- RESIZE CORNER
+
+self.Resize=Instance.new("TextButton")
+
+self.Resize.Size=
+    UDim2.fromOffset(30,30)
+
+self.Resize.Position=
+    UDim2.new(1,-30,1,-30)
+
+self.Resize.Text="◢"
+
+self.Resize.Font=self.Font
+
+self.Resize.TextSize=20
+
+self.Resize.BackgroundTransparency=1
+
+self.Resize.TextColor3=
+    Theme.Accent2
+
+self.Resize.Parent=self.MainFrame
+
+
+
+
+
+-- DRAG SYSTEM
+
+local dragging=false
+local dragStart
+local startPos
+
+
+self.Topbar.InputBegan:Connect(function(input)
+
+if input.UserInputType==
+Enum.UserInputType.MouseButton1
+or
+input.UserInputType==
+Enum.UserInputType.Touch then
+
+dragging=true
+
+dragStart=input.Position
+
+startPos=self.MainFrame.Position
 
 end
+
+end)
+
+
+
+self.Topbar.InputChanged:Connect(function(input)
+
+if input.UserInputType==
+Enum.UserInputType.MouseMovement
+or
+input.UserInputType==
+Enum.UserInputType.Touch then
+
+
+input.Changed:Connect(function()
+
+if input.UserInputState==
+Enum.UserInputState.Change
+and dragging then
+
+
+local delta=
+input.Position-dragStart
+
+
+self.MainFrame.Position=
+UDim2.new(
+startPos.X.Scale,
+startPos.X.Offset+delta.X,
+startPos.Y.Scale,
+startPos.Y.Offset+delta.Y
+)
+
+
+end
+
+end)
+
+
+end
+
+end)
+
+
+UserInputService.InputEnded:Connect(function(input)
+
+if input.UserInputType==
+Enum.UserInputType.MouseButton1
+or
+input.UserInputType==
+Enum.UserInputType.Touch then
+
+dragging=false
+
+end
+
+end)
+
+
+
+
+
+
+-- RESIZE SYSTEM
+
+local resizing=false
+local resizeStart
+local startSize
+
+
+self.Resize.InputBegan:Connect(function(input)
+
+if input.UserInputType==
+Enum.UserInputType.MouseButton1
+or
+input.UserInputType==
+Enum.UserInputType.Touch then
+
+
+resizing=true
+
+resizeStart=input.Position
+
+startSize=self.MainFrame.AbsoluteSize
+
+
+end
+
+end)
+
+
+
+UserInputService.InputChanged:Connect(function(input)
+
+if resizing and
+(
+input.UserInputType==
+Enum.UserInputType.MouseMovement
+or
+input.UserInputType==
+Enum.UserInputType.Touch
+)
+then
+
+
+local delta=
+input.Position-resizeStart
+
+
+self.MainFrame.Size=
+UDim2.fromOffset(
+math.max(200,startSize.X+delta.X),
+math.max(100,startSize.Y+delta.Y)
+)
+
+
+end
+
+end)
+
+
+
+UserInputService.InputEnded:Connect(function()
+
+resizing=false
+
+end)
+
+
+
+
+
+
+self.Minimize.MouseButton1Click:Connect(function()
+self:ToggleMinimize()
+end)
+
+
+self.CloseButton.MouseButton1Click:Connect(function()
+self:Destroy()
+end)
+
+
+
+self.Gui.Parent=game:GetService("CoreGui")
+
+
+return self
+
+end
+
 
 
 
@@ -349,56 +406,43 @@ end
 
 function Window:ToggleMinimize()
 
-    self.Minimized =
-        not self.Minimized
+self.Minimized=
+not self.Minimized
 
 
-    local target =
-        self.Minimized and
-        0 or
-        1
+local hide=self.Minimized
 
 
-    TweenService:Create(
-        self.Minimize,
-        TweenInfo.new(.2),
-        {
-            Rotation =
-            self.Minimized and 90 or 0
-        }
-    ):Play()
+Tween(
+self.Minimize,
+0.2,
+{
+Rotation=
+hide and -90 or 0
+}
+)
 
 
-
-    TweenService:Create(
-        self.TabContainer,
-        TweenInfo.new(.2),
-        {
-            Size =
-            UDim2.new(
-                1,
-                0,
-                0,
-                self.Minimized and 0 or 20
-            )
-        }
-    ):Play()
+Tween(
+self.MainFrame,
+0.2,
+{
+Size=
+UDim2.fromOffset(
+self.Size.X,
+hide and 25 or self.Size.Y
+)
+}
+)
 
 
+self.TabContainer.Visible=
+not hide
 
-    TweenService:Create(
-        self.MainFrame,
-        TweenInfo.new(.2),
-        {
-            Size =
-            UDim2.fromOffset(
-                self.Size.X,
-                self.Minimized and 20 or self.Size.Y
-            )
-        }
-    ):Play()
+
 
 end
+
 
 
 
@@ -406,54 +450,47 @@ end
 
 function Window:Open()
 
-    self.MainFrame.Visible = true
+self.MainFrame.Visible=true
 
-    if self.Minimized then
-        self:ToggleMinimize()
-    end
-
+if self.Minimized then
+self:ToggleMinimize()
 end
 
+end
 
 
 
 function Window:Close()
 
-    if not self.Minimized then
-        self:ToggleMinimize()
-    end
-
+if not self.Minimized then
+self:ToggleMinimize()
 end
 
+end
 
 
 
 function Window:Toggle()
 
-    self.MainFrame.Visible =
-        not self.MainFrame.Visible
+self.MainFrame.Visible=
+not self.MainFrame.Visible
 
 end
 
 
 
+function Window:SetTitle(t)
 
-
-function Window:SetTitle(text)
-
-    self.Title = text
-
-    self.TitleFrame.Text =
-        text
+self.Title=t
+self.TitleFrame.Text=t
 
 end
-
 
 
 
 function Window:Destroy()
 
-    self.Gui:Destroy()
+self.Gui:Destroy()
 
 end
 
