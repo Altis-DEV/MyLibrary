@@ -1,160 +1,44 @@
--- Path: Altis-DEV/MyLibrary/Init.lua
+-- Init.lua
+local IrisUI = {}
 
-local BaseURL =
-    "https://raw.githubusercontent.com/Altis-DEV/MyLibrary/refs/heads/main/"
+-- Đường dẫn raw tới repo (Bạn nhớ giữ nguyên URL này theo repo của bạn)
+local BaseURL = "https://raw.githubusercontent.com/Altis-DEV/MyLibrary/refs/heads/main/"
 
-
-local function Notify(msg)
-
-    warn("[Altis Library] "..msg)
-
-    if game:GetService("StarterGui") then
-        pcall(function()
-            game:GetService("StarterGui"):SetCore(
-                "SendNotification",
-                {
-                    Title = "Altis Library",
-                    Text = msg,
-                    Duration = 5
-                }
-            )
-        end)
-    end
-
-end
-
-
-
+-- Hàm hỗ trợ tải file từ Github
 local function LoadModule(path)
-
     local url = BaseURL .. path
-
-    Notify("Loading: "..url)
-
-
     local success, result = pcall(function()
-
-        local source = game:HttpGet(url)
-
-
-        if not source or source == "" then
-            error("Empty response")
-        end
-
-
-        local func, err =
-            loadstring(source)
-
-
-        if not func then
-            error(
-                "loadstring failed: "..tostring(err)
-            )
-        end
-
-
-        return func()
-
+        return loadstring(game:HttpGet(url))()
     end)
-
-
-
+    
     if not success then
-
-        Notify(
-            "Failed: "..path..
-            "\n"..tostring(result)
-        )
-
-        error(
-            "[Altis Library] Module error: "
-            ..path..
-            "\n"
-            ..tostring(result)
-        )
-
+        warn("[Iris UI] Failed to load module: " .. path)
+        warn("Error: " .. tostring(result))
+        return nil
     end
-
-
-
-    Notify(
-        "Loaded: "..path
-    )
-
-
+    
     return result
-
 end
 
+-- Tải Theme mặc định
+local Theme = LoadModule("Src/Theme.lua")
+if not Theme then return nil end
 
+-- Tải và khởi tạo Window Engine
+local WindowEngine = LoadModule("Src/Window.lua")
+if not WindowEngine then return nil end
 
+-- Gắn Theme vào Engine
+local WindowCore = WindowEngine(Theme)
 
-
-local Library = {}
-
-
-
-local ThemeModule =
-    LoadModule(
-        "Src/Theme.lua"
-    )
-
-
-if type(ThemeModule) ~= "table" then
-
-    error(
-        "Theme.lua must return table"
-    )
-
+-- Hàm khởi tạo Window (Entry point cho người dùng)
+function IrisUI:CreateWindow(config)
+    local WindowObject = WindowCore.Create(config)
+    
+    -- (Tương lai) Chỗ này sẽ inject các hàm khởi tạo Tab, ElementContainer, Button...
+    -- Ví dụ: function WindowObject.AddTab(...) end
+    
+    return WindowObject
 end
 
-
-
-Library.Theme =
-    ThemeModule
-
-
-
-
-
-function Library.CreateWindow(config)
-
-    local WindowModule =
-        LoadModule(
-            "Src/Window.lua"
-        )
-
-
-    if type(WindowModule) ~= "table" then
-
-        error(
-            "Window.lua did not return module table"
-        )
-
-    end
-
-
-    if not WindowModule.new then
-
-        error(
-            "Window.lua missing .new function"
-        )
-
-    end
-
-
-
-    return WindowModule.new(
-        config,
-        Library.Theme
-    )
-
-end
-
-
-
-
-Notify("Library initialized successfully")
-
-
-return Library
+return IrisUI
