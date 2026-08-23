@@ -3,84 +3,73 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
+-- Logic Drag mượt mà hỗ trợ PC/Mobile
 local function MakeDraggable(trigger, target)
-    trigger.Active = true
+    local dragging, dragInput, dragStart, startPos
     
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local isDragging = false
-            local isCancelled = false
-            local dragStart = input.Position
-            local startPos = target.Position
+            dragging = true
+            dragStart = input.Position
+            startPos = target.Position
             
-            local holdTimer
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                isDragging = true
-            else
-                holdTimer = task.delay(0.1, function()
-                    if not isCancelled then
-                        isDragging = true
-                    end
-                end)
-            end
-            
-            local connectionMove, connectionEnd
-            
-            connectionMove = UserInputService.InputChanged:Connect(function(changeInput)
-                if changeInput == input then
-                    if isDragging then
-                        local delta = changeInput.Position - dragStart
-                        target.Position = UDim2.new(
-                            startPos.X.Scale, startPos.X.Offset + delta.X,
-                            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                        )
-                    else
-                        local delta = changeInput.Position - dragStart
-                        if delta.Magnitude > 10 then
-                            isCancelled = true
-                            if holdTimer then task.cancel(holdTimer) end
-                        end
-                    end
-                end
-            end)
-            
-            connectionEnd = UserInputService.InputEnded:Connect(function(endInput)
-                if endInput == input then
-                    isCancelled = true
-                    isDragging = false
-                    if holdTimer then task.cancel(holdTimer) end
-                    if connectionMove then connectionMove:Disconnect() end
-                    if connectionEnd then connectionEnd:Disconnect() end
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
                 end
             end)
         end
     end)
+    
+    trigger.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            target.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
 end
 
-local function MakeResizable(trigger, target)
-    trigger.Active = true
+-- Logic Resize hỗ trợ PC/Mobile kèm MinSize/MaxSize
+local function MakeResizable(trigger, target, minSize, maxSize)
+    local dragging, dragInput, dragStart, startSize
+    
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local dragStart = input.Position
-            local startSize = target.Size
+            dragging = true
+            dragStart = input.Position
+            startSize = target.Size
             
-            local connectionMove, connectionEnd
-            
-            connectionMove = UserInputService.InputChanged:Connect(function(changeInput)
-                if changeInput == input then
-                    local delta = changeInput.Position - dragStart
-                    local newWidth = math.max(200, startSize.X.Offset + delta.X)
-                    local newHeight = math.max(100, startSize.Y.Offset + delta.Y)
-                    target.Size = UDim2.new(startSize.X.Scale, newWidth, startSize.Y.Scale, newHeight)
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
                 end
             end)
+        end
+    end)
+    
+    trigger.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            -- Clamp kích thước dựa trên MinSize và MaxSize
+            local newX = math.clamp(startSize.X.Offset + delta.X, minSize.X, maxSize.X)
+            local newY = math.clamp(startSize.Y.Offset + delta.Y, minSize.Y, maxSize.Y)
             
-            connectionEnd = UserInputService.InputEnded:Connect(function(endInput)
-                if endInput == input then
-                    if connectionMove then connectionMove:Disconnect() end
-                    if connectionEnd then connectionEnd:Disconnect() end
-                end
-            end)
+            target.Size = UDim2.new(startSize.X.Scale, newX, startSize.Y.Scale, newY)
         end
     end)
 end
@@ -110,10 +99,16 @@ return function(Theme)
     function Window.Create(config)
         config = config or {}
         local titleText = config.Title or "Iris UI Remake"
-        local winSize = config.Size or UDim2.new(0, 400, 0, 300)
         local winPos = config.Position or UDim2.fromScale(0.5, 0.5)
         local customFont = config.Font or Theme.Font
         
+        -- Cấu hình Kích thước & Giới hạn
+        local minSize = config.MinSize or Vector2.new(300, 200)
+        local maxSize = config.MaxSize or Vector2.new(9999, 9999)
+        local startSizeX = math.clamp(config.Size and config.Size.X.Offset or 400, minSize.X, maxSize.X)
+        local startSizeY = math.clamp(config.Size and config.Size.Y.Offset or 300, minSize.Y, maxSize.Y)
+        local winSize = UDim2.new(0, startSizeX, 0, startSizeY)
+
         local alignMap = {
             Left = Enum.TextXAlignment.Left,
             Right = Enum.TextXAlignment.Right,
@@ -268,9 +263,10 @@ return function(Theme)
         DragHandle.ZIndex = 8
         DragHandle.Parent = DragWrapper
 
+        -- Áp dụng Drag và Resize
         MakeDraggable(Topbar, WindowRoot)
         MakeDraggable(DragHandle, WindowRoot)
-        MakeResizable(ResizeCorner, WindowRoot)
+        MakeResizable(ResizeCorner, WindowRoot, minSize, maxSize)
 
         local TextElements = {TitleLabel, MinimizeButton, DestroyButton, ResizeCorner}
         for _, el in ipairs(TextElements) do
@@ -302,7 +298,7 @@ return function(Theme)
             MainFrame = MainFrame,
             TabContainer = TabContainer,
             TextElements = TextElements,
-            Font = customFont -- Lưu Font để truyền cho Tab/Elements sau này
+            Font = customFont
         }
 
         function WindowObject.SetTitle(newTitle)
@@ -310,8 +306,11 @@ return function(Theme)
         end
 
         function WindowObject.SetSize(newSize)
-            WindowRoot.Size = newSize
-            if not isMinimized then preMinimizeSize = newSize end
+            -- Đảm bảo code tự gọi SetSize cũng tuân thủ Min/Max (nếu cần thiết có thể gỡ bỏ clamp ở đây)
+            local clampedX = math.clamp(newSize.X.Offset, minSize.X, maxSize.X)
+            local clampedY = math.clamp(newSize.Y.Offset, minSize.Y, maxSize.Y)
+            WindowRoot.Size = UDim2.new(newSize.X.Scale, clampedX, newSize.Y.Scale, clampedY)
+            if not isMinimized then preMinimizeSize = WindowRoot.Size end
         end
 
         function WindowObject.SetPosition(newPos)
@@ -319,7 +318,7 @@ return function(Theme)
         end
 
         function WindowObject.SetFont(newFont)
-            WindowObject.Font = newFont -- Cập nhật font hệ thống
+            WindowObject.Font = newFont 
             for _, el in ipairs(WindowObject.TextElements) do
                 ApplyFont(el, newFont, Theme.Font)
             end
