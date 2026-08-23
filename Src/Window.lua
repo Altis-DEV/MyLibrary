@@ -19,7 +19,7 @@ local function MakeDraggable(trigger, target)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 isDragging = true
             else
-                holdTimer = task.delay(0.2, function()
+                holdTimer = task.delay(0.1, function()
                     if not isCancelled then
                         isDragging = true
                     end
