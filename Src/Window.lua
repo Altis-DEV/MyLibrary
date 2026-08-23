@@ -3,73 +3,62 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
--- Hàm hỗ trợ kéo thả (Drag) cho cả PC & Mobile
+-- Logic Drag chuẩn: Chỉ nhận input chính xác từ ngón tay/con trỏ đã click ban đầu
 local function MakeDraggable(trigger, target)
-    local dragging, dragInput, dragStart, startPos
-
+    trigger.Active = true -- Chặn input xuyên qua UI
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = target.Position
-
+            local dragStart = input.Position
+            local startPos = target.Position
+            
+            local connection
+            connection = UserInputService.InputChanged:Connect(function(changeInput)
+                -- Kiểm tra identity: Phải đúng cái input vừa chạm vào mới xử lý
+                if changeInput == input then
+                    local delta = changeInput.Position - dragStart
+                    target.Position = UDim2.new(
+                        startPos.X.Scale, startPos.X.Offset + delta.X,
+                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                    )
+                end
+            end)
+            
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
+                    if connection then connection:Disconnect() end
                 end
             end)
         end
     end)
-
-    trigger.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
 end
 
--- Hàm hỗ trợ thay đổi kích thước (Resize)
+-- Logic Resize chuẩn, tương tự như Drag
 local function MakeResizable(trigger, target)
-    local dragging, dragInput, dragStart, startSize
-
+    trigger.Active = true
     trigger.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startSize = target.Size
-
+            local dragStart = input.Position
+            local startSize = target.Size
+            
+            local connection
+            connection = UserInputService.InputChanged:Connect(function(changeInput)
+                if changeInput == input then
+                    local delta = changeInput.Position - dragStart
+                    local newWidth = math.max(200, startSize.X.Offset + delta.X)
+                    local newHeight = math.max(100, startSize.Y.Offset + delta.Y)
+                    target.Size = UDim2.new(startSize.X.Scale, newWidth, startSize.Y.Scale, newHeight)
+                end
+            end)
+            
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
+                    if connection then connection:Disconnect() end
                 end
             end)
         end
     end)
-
-    trigger.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            local newWidth = math.max(200, startSize.X.Offset + delta.X)
-            local newHeight = math.max(100, startSize.Y.Offset + delta.Y)
-            target.Size = UDim2.new(startSize.X.Scale, newWidth, startSize.Y.Scale, newHeight)
-        end
-    end)
 end
 
--- Hàm hỗ trợ set Font đa năng
 local function ApplyFont(element, fontInput, themeDefault)
     if typeof(fontInput) == "EnumItem" then
         element.Font = fontInput
@@ -105,7 +94,6 @@ return function(Theme)
         }
         local textAlign = alignMap[config.TextAlignment] or Enum.TextXAlignment.Left
 
-        -- 1. Khởi tạo ScreenGui và WindowRoot
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "Iris_UI"
         screenGui.ResetOnSpawn = false
@@ -120,52 +108,55 @@ return function(Theme)
         WindowRoot.Position = winPos
         WindowRoot.AnchorPoint = Vector2.new(0, 0)
         WindowRoot.BackgroundTransparency = 1
-        WindowRoot.ClipsDescendants = true -- Phục vụ cho animation Minimize
+        WindowRoot.ClipsDescendants = true
         WindowRoot.Parent = screenGui
 
         local RootLayout = Instance.new("UIListLayout")
         RootLayout.SortOrder = Enum.SortOrder.LayoutOrder
         RootLayout.Parent = WindowRoot
 
-        -- 2. Topbar
+        -- ================= 1. Topbar (Chiều cao 30, ZIndex 10) =================
         local Topbar = Instance.new("Frame")
         Topbar.Name = "Topbar"
-        Topbar.Size = UDim2.new(1, 0, 0, 20)
+        Topbar.Size = UDim2.new(1, 0, 0, 30)
         Topbar.BackgroundColor3 = Theme.Accent1
         Topbar.BorderSizePixel = 0
         Topbar.LayoutOrder = 1
+        Topbar.ZIndex = 10
         Topbar.Parent = WindowRoot
 
         local TopbarStroke = Instance.new("UIStroke")
         TopbarStroke.Color = Theme.Border
         TopbarStroke.Parent = Topbar
 
-        -- Các thành phần của Topbar
         local MinimizeButton = Instance.new("TextButton")
         MinimizeButton.Name = "MinimizeButton"
-        MinimizeButton.Size = UDim2.new(0, 20, 1, 0)
+        MinimizeButton.Size = UDim2.new(0, 30, 1, 0)
         MinimizeButton.Position = UDim2.new(0, 0, 0, 0)
         MinimizeButton.BackgroundTransparency = 1
         MinimizeButton.Text = "▼"
         MinimizeButton.TextColor3 = Theme.Text
-        MinimizeButton.TextSize = 12
+        MinimizeButton.TextSize = 14
+        MinimizeButton.ZIndex = 10
         MinimizeButton.Parent = Topbar
 
         local DestroyButton = Instance.new("TextButton")
         DestroyButton.Name = "DestroyButton"
-        DestroyButton.Size = UDim2.new(0, 20, 1, 0)
-        DestroyButton.Position = UDim2.new(1, -20, 0, 0)
+        DestroyButton.Size = UDim2.new(0, 30, 1, 0)
+        DestroyButton.Position = UDim2.new(1, -30, 0, 0)
         DestroyButton.BackgroundTransparency = 1
         DestroyButton.Text = "X"
         DestroyButton.TextColor3 = Theme.Text
-        DestroyButton.TextSize = 14
+        DestroyButton.TextSize = 16
+        DestroyButton.ZIndex = 10
         DestroyButton.Parent = Topbar
 
         local TitleFrame = Instance.new("Frame")
         TitleFrame.Name = "TitleFrame"
-        TitleFrame.Size = UDim2.new(1, -40, 1, 0)
-        TitleFrame.Position = UDim2.new(0, 20, 0, 0)
+        TitleFrame.Size = UDim2.new(1, -60, 1, 0)
+        TitleFrame.Position = UDim2.new(0, 30, 0, 0)
         TitleFrame.BackgroundTransparency = 1
+        TitleFrame.ZIndex = 10
         TitleFrame.Parent = Topbar
 
         local TitleLabel = Instance.new("TextLabel")
@@ -176,19 +167,20 @@ return function(Theme)
         TitleLabel.Text = titleText
         TitleLabel.TextColor3 = Theme.Text
         TitleLabel.TextXAlignment = textAlign
-        TitleLabel.TextSize = 13
+        TitleLabel.TextSize = 14
+        TitleLabel.ZIndex = 10
         TitleLabel.Parent = TitleFrame
 
-        -- 3. TabContainer
+        -- ================= 2. TabContainer (Chiều cao 30) =================
         local TabContainer = Instance.new("ScrollingFrame")
         TabContainer.Name = "TabContainer"
-        TabContainer.Size = UDim2.new(1, 0, 0, 20)
+        TabContainer.Size = UDim2.new(1, 0, 0, 30)
         TabContainer.BackgroundColor3 = Theme.Background
         TabContainer.BorderSizePixel = 0
         TabContainer.LayoutOrder = 2
         TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
         TabContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-        TabContainer.ScrollBarThickness = 0 -- Ẩn scrollbar default để nhìn clean hơn
+        TabContainer.ScrollBarThickness = 0
         TabContainer.Parent = WindowRoot
 
         local TabStroke = Instance.new("UIStroke")
@@ -200,62 +192,73 @@ return function(Theme)
         TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
         TabLayout.Parent = TabContainer
 
-        -- 4. MainFrame
-        local MainFrame = Instance.new("Frame")
+        -- ================= 3. BodyWrapper & MainFrame (Scrolling) =================
+        -- Wrapper dùng để chứa MainFrame và ResizeCorner, tránh việc ResizeCorner bị cuộn đi
+        local BodyWrapper = Instance.new("Frame")
+        BodyWrapper.Name = "BodyWrapper"
+        -- Tổng chiều cao = (Topbar 30) + (Tab 30) + (DragWrapper 25) = 85
+        BodyWrapper.Size = UDim2.new(1, 0, 1, -85)
+        BodyWrapper.BackgroundTransparency = 1
+        BodyWrapper.LayoutOrder = 3
+        BodyWrapper.Parent = WindowRoot
+
+        local MainFrame = Instance.new("ScrollingFrame")
         MainFrame.Name = "MainFrame"
-        -- Chiều cao = Tổng - (Topbar:20 + TabContainer:20 + DragHandle:5)
-        MainFrame.Size = UDim2.new(1, 0, 1, -45) 
+        MainFrame.Size = UDim2.new(1, 0, 1, 0) 
         MainFrame.BackgroundColor3 = Theme.Background
         MainFrame.BorderSizePixel = 0
-        MainFrame.LayoutOrder = 3
-        MainFrame.Parent = WindowRoot
+        MainFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        MainFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        MainFrame.ScrollBarThickness = 4
+        MainFrame.ScrollBarImageColor3 = Theme.Border
+        MainFrame.Parent = BodyWrapper
 
         local MainStroke = Instance.new("UIStroke")
         MainStroke.Color = Theme.Border
         MainStroke.Parent = MainFrame
 
-        -- ResizeCorner (Tam giác vuông ở góc phải dưới của MainFrame)
+        -- ResizeCorner (ZIndex 9, Kích thước to hơn)
         local ResizeCorner = Instance.new("TextLabel")
         ResizeCorner.Name = "ResizeCorner"
-        ResizeCorner.Size = UDim2.new(0, 15, 0, 15)
+        ResizeCorner.Size = UDim2.new(0, 30, 0, 30)
         ResizeCorner.Position = UDim2.new(1, 0, 1, 0)
         ResizeCorner.AnchorPoint = Vector2.new(1, 1)
         ResizeCorner.BackgroundTransparency = 1
         ResizeCorner.Text = "◢"
         ResizeCorner.TextColor3 = Theme.Accent1
-        ResizeCorner.TextSize = 14
-        ResizeCorner.Parent = MainFrame
+        ResizeCorner.TextSize = 25
+        ResizeCorner.ZIndex = 9
+        ResizeCorner.Parent = BodyWrapper
 
-        -- 5. DragHandle
+        -- ================= 4. DragHandle (ZIndex 8, Cách xuống 20 stud) =================
+        -- Wrapper cao 25px để tạo khoảng trống đẩy DragHandle xuống
         local DragWrapper = Instance.new("Frame")
         DragWrapper.Name = "DragWrapper"
-        DragWrapper.Size = UDim2.new(1, 0, 0, 5)
+        DragWrapper.Size = UDim2.new(1, 0, 0, 25)
         DragWrapper.BackgroundTransparency = 1
         DragWrapper.LayoutOrder = 4
         DragWrapper.Parent = WindowRoot
 
         local DragHandle = Instance.new("Frame")
         DragHandle.Name = "DragHandle"
-        DragHandle.Size = UDim2.new(0, 100, 1, 0)
-        DragHandle.Position = UDim2.new(0.5, 0, 0, 0)
+        DragHandle.Size = UDim2.new(0, 100, 0, 5)
+        DragHandle.Position = UDim2.new(0.5, 0, 0, 20) -- Đẩy xuống dưới 20 stud
         DragHandle.AnchorPoint = Vector2.new(0.5, 0)
-        DragHandle.BackgroundColor3 = Theme.Background
-        DragHandle.BackgroundTransparency = 0.5
+        DragHandle.BackgroundColor3 = Theme.Accent1 -- Đổi thành Accent1 theo yêu cầu
         DragHandle.BorderSizePixel = 0
+        DragHandle.ZIndex = 8
         DragHandle.Parent = DragWrapper
 
-        -- Kích hoạt Draggable & Resizable
+        -- Kích hoạt hệ thống kéo/thả mới
         MakeDraggable(Topbar, WindowRoot)
         MakeDraggable(DragHandle, WindowRoot)
         MakeResizable(ResizeCorner, WindowRoot)
 
-        -- Quản lý Text & Font
         local TextElements = {TitleLabel, MinimizeButton, DestroyButton, ResizeCorner}
         for _, el in ipairs(TextElements) do
             ApplyFont(el, config.Font, Theme.Font)
         end
 
-        -- Logic Minimize
         local isMinimized = false
         local preMinimizeSize = WindowRoot.Size
 
@@ -264,8 +267,8 @@ return function(Theme)
             if isMinimized then
                 preMinimizeSize = WindowRoot.Size
                 TweenService:Create(MinimizeButton, TweenInfo.new(0.2), {Rotation = -90}):Play()
-                -- Thu gọn kích thước WindowRoot về đúng bằng chiều cao Topbar (20px)
-                TweenService:Create(WindowRoot, TweenInfo.new(0.2), {Size = UDim2.new(preMinimizeSize.X.Scale, preMinimizeSize.X.Offset, 0, 20)}):Play()
+                -- Shrink size về đúng chiều cao của Topbar (30)
+                TweenService:Create(WindowRoot, TweenInfo.new(0.2), {Size = UDim2.new(preMinimizeSize.X.Scale, preMinimizeSize.X.Offset, 0, 30)}):Play()
             else
                 TweenService:Create(MinimizeButton, TweenInfo.new(0.2), {Rotation = 0}):Play()
                 TweenService:Create(WindowRoot, TweenInfo.new(0.2), {Size = preMinimizeSize}):Play()
@@ -274,12 +277,10 @@ return function(Theme)
 
         MinimizeButton.MouseButton1Click:Connect(ToggleMinimize)
 
-        -- Logic Destroy
         DestroyButton.MouseButton1Click:Connect(function()
             screenGui:Destroy()
         end)
 
-        -- Trả về Object với các Method
         local WindowObject = {
             MainFrame = MainFrame,
             TabContainer = TabContainer,
@@ -326,4 +327,3 @@ return function(Theme)
 
     return Window
 end
-
